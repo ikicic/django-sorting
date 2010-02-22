@@ -4,7 +4,7 @@ How to use django-sorting
 ``django-sorting`` allows for easy sorting, and sorting links generation 
 without modifying your views.
 
-There are really 5 steps to setting it up with your projects.
+There are really 4 steps to setting it up with your projects.
 
 1. List this application in the ``INSTALLED_APPS`` portion of your settings
    file.  Your settings file might look something like::
@@ -14,15 +14,7 @@ There are really 5 steps to setting it up with your projects.
            'django_sorting',
        )
 
-2. Install the sorting middleware. Your settings file might look something
-   like::
-   
-       MIDDLEWARE_CLASSES = (
-           # ...
-           'django_sorting.middleware.SortingMiddleware',
-       )
-
-3. If it's not already added in your setup, add the request context processor.
+2. If it's not already added in your setup, add the request context processor.
    Note that context processors are set by default implicitly, so to set them
    explicitly, you need to copy and paste this code into your under
    the value TEMPLATE_CONTEXT_PROCESSORS::
@@ -39,11 +31,16 @@ There are really 5 steps to setting it up with your projects.
 
 
 5. Decide on a variable that you would like to sort, and use the
-   autosort tag on that variable before iterating over it.    
-       
+   autosort tag on that variable before iterating over it.
+
        {% autosort object_list %}
-       
-   
+       or (which is more secure) {% autosort object_list accepted_fields %}
+       or {% autosort object_list accepted_fields default_ordering %}
+
+    for example
+
+       {% autosort books created_at,author__last_name,author__first_name author__last_name,author__first_name %}
+
 6. Now, you want to display different headers with links to sort 
 your objects_list:
    
