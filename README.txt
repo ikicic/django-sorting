@@ -25,12 +25,12 @@ There are really 4 steps to setting it up with your projects.
         "django.core.context_processors.media",
         "django.core.context_processors.request")
 
-4. Add this line at the top of your template to load the sorting tags:
+3. Add this line at the top of your template to load the sorting tags:
 
        {% load sorting_tags %}
 
 
-5. Decide on a variable that you would like to sort, and use the
+4. Decide on a variable that you would like to sort, and use the
    autosort tag on that variable before iterating over it.
 
        {% autosort object_list %}
@@ -41,7 +41,7 @@ There are really 4 steps to setting it up with your projects.
 
        {% autosort books created_at,author__last_name,author__first_name author__last_name,author__first_name %}
 
-6. Now, you want to display different headers with links to sort 
+. Now, you want to display different headers with links to sort 
 your objects_list:
    
     <tr>
