@@ -22,9 +22,9 @@ def anchor(parser, token):
     """
     Parses a tag that's supposed to be in this format: {% anchor field title fragment %}
     """
-    bits = [b.strip('"\'') for b in token.split_contents()]
+    bits = token.contents.split()
     if not (2 < len(bits) < 5):
-        raise TemplateSyntaxError, "anchor tag takes at least 1 argument"
+        raise TemplateSyntaxError, "anchor tag takes at least 2 arguments"
     title = bits[2]
     try:
         fragment = bits[3]
@@ -45,15 +45,18 @@ class SortAnchorNode(template.Node):
 
     """
     def __init__(self, field, title, fragment):
-        self.field = field
-        self.title = title
-        self.fragment = fragment
+        self.field = template.Variable(field)
+        self.title = title and template.Variable(title)
+        self.fragment = fragment and template.Variable(fragment)
 
     def render(self, context):
         request = context['request']
         getvars = request.GET.copy()
+        field = self.field.resolve(context)
+        title = self.title and self.title.resolve(context)
+        fragment = self.fragment and self.fragment.resolve(context)
 
-        if getattr(request, 'sort', getvars.get('sort', '')) == self.field:
+        if getattr(request, 'sort', getvars.get('sort', '')) == field:
             sortdir = getattr(request, 'direction', getvars.get('direction', ''))
             getvars['direction'] = sort_directions[sortdir]['inverse']
             icon = sort_directions[sortdir]['icon']
@@ -61,18 +64,17 @@ class SortAnchorNode(template.Node):
         else:
             getvars['direction'] = 'desc'
             css_class = icon = ''
-        getvars['sort'] = self.field
+        getvars['sort'] = field
         if icon:
-            title = "%s %s" % (self.title, icon)
+            title = "%s %s" % (title, icon)
         else:
-            title = self.title
+            title = title
 
-        url = urlunparse(('', '', '', None, getvars.urlencode(), self.fragment))
-        return '<a href="%s" class="%s" title="%s">%s</a>' % (url, css_class, self.title, title)
-
+        url = urlunparse(('', '', '', None, getvars.urlencode(), fragment))
+        return '<a href="%s" class="%s" title="%s">%s</a>' % (url, css_class, title, title)
 
 def autosort(parser, token):
-    bits = [b.strip('"\'') for b in token.split_contents()]
+    bits = token.contents.split()
     if not (1 < len(bits) < 5):
         raise template.TemplateSyntaxError, "autosort tag takes exactly one argument"
     try:
@@ -93,13 +95,13 @@ class SortedDataNode(template.Node):
     """
     def __init__(self, queryset_var, accepted_fields=None, default_ordering=None):
         self.queryset_var = template.Variable(queryset_var)
-        self.accepted_fields = accepted_fields.split(',')
-        self.default_ordering = default_ordering
+        self.accepted_fields = accepted_fields and template.Variable(accepted_fields)
+        self.default_ordering = default_ordering and template.Variable(default_ordering)
 
-    def get_fields(self, request, accepted_fields=None):
+    def get_fields(self, request, accepted_fields=None, default_ordering=None):
         fields = getattr(request, 'sort', request.REQUEST.get('sort', ''))
-        if not fields and self.default_ordering:
-            fields = request.sort = self.default_ordering
+        if not fields and default_ordering:
+            fields = request.sort = default_ordering
         direction = getattr(request, 'direction', request.REQUEST.get('direction', 'desc')) =='desc' and '-' or ''
 
         fields = [
@@ -116,7 +118,15 @@ class SortedDataNode(template.Node):
         key = self.queryset_var.var
         value = self.queryset_var.resolve(context)
         request = context['request']
-        order_by = value.query.order_by + self.get_fields(request, self.accepted_fields)
+        accepted_fields = \
+            self.accepted_fields and [field.strip() for field in self.accepted_fields.resolve(context).split(',')]
+        default_ordering = self.default_ordering and self.default_ordering.resolve(context)
+
+        order_by = value.query.order_by + self.get_fields(
+            request,
+            accepted_fields,
+            default_ordering
+        )
 
         try:
             context[key] = value.order_by(*order_by)

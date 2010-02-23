@@ -39,14 +39,14 @@ There are really 4 steps to setting it up with your projects.
 
     for example
 
-       {% autosort books created_at,author__last_name,author__first_name author__last_name,author__first_name %}
+       {% autosort books 'created_at,author__last_name,author__first_name' 'author__last_name,author__first_name' %}
 
 . Now, you want to display different headers with links to sort 
 your objects_list:
    
     <tr>
-       <th>{% anchor first_name Name %}</th>
-       <th>{% anchor creation_date Creation %}</th>
+       <th>{% anchor 'last_name,first_name' 'Name' 'authors-list' %}</th>
+       <th>{% anchor 'creation_date' 'Creation' %}</th>
         ...
     </tr>
 
@@ -55,12 +55,12 @@ your objects_list:
     snippet will be rendered like this:
 
     <tr>
-        <th><a href="/path/to/your/view/?sort=first_name" title="Name">Name</a></th>
+        <th><a href="/path/to/your/view/?sort=last_name,first_name#authors-list" title="Name">Name</a></th>
         <th><a href="/path/to/your/view/?sort=creation_date" title="Name">Creation</a></th>
         ...
     </tr>
 
 
-That's it!  
+That's it!
 
 
