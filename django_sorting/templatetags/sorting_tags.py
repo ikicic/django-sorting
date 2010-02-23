@@ -22,9 +22,9 @@ def anchor(parser, token):
     """
     Parses a tag that's supposed to be in this format: {% anchor field title fragment %}
     """
-    bits = token.contents.split()
+    bits = token.split_contents()
     if not (2 < len(bits) < 5):
-        raise TemplateSyntaxError, "anchor tag takes at least 2 arguments"
+        raise template.TemplateSyntaxError("anchor tag takes at least 2 arguments")
     title = bits[2]
     try:
         fragment = bits[3]
@@ -74,9 +74,9 @@ class SortAnchorNode(template.Node):
         return '<a href="%s" class="%s" title="%s">%s</a>' % (url, css_class, title, title)
 
 def autosort(parser, token):
-    bits = token.contents.split()
+    bits = token.split_contents()
     if not (1 < len(bits) < 5):
-        raise template.TemplateSyntaxError, "autosort tag takes exactly one argument"
+        raise template.TemplateSyntaxError("autosort tag takes exactly one argument")
     try:
         accepted_fields = bits[2]
     except IndexError:
