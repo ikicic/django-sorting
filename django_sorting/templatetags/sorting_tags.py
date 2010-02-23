@@ -1,3 +1,4 @@
+from functools import wraps
 from urlparse import urlunparse
 
 from django import template
@@ -9,8 +10,7 @@ register = template.Library()
 
 DEFAULT_SORT_UP = getattr(settings, 'DEFAULT_SORT_UP' , '&uarr;')
 DEFAULT_SORT_DOWN = getattr(settings, 'DEFAULT_SORT_DOWN' , '&darr;')
-INVALID_FIELD_RAISES_404 = getattr(settings,
-        'SORTING_INVALID_FIELD_RAISES_404' , False)
+INVALID_FIELD_RAISES_404 = getattr(settings, 'SORTING_INVALID_FIELD_RAISES_404' , False)
 
 sort_directions = {
     'asc': {'icon':DEFAULT_SORT_UP, 'inverse': 'desc'},
@@ -18,19 +18,28 @@ sort_directions = {
     '': {'icon':DEFAULT_SORT_DOWN, 'inverse': 'asc'},
 }
 
-def anchor(parser, token):
+def parse_args(tag):
+    @wraps(tag)
+    def fun(parser, token):
+        bits = token.split_contents()
+        args = []
+        kwargs = {}
+        for arg in bits[1:]:
+            var = template.Variable(arg)
+            if var.literal or not '=' in arg:
+                args.append(var)
+            else:
+                key, value = arg.split('=', 1)
+                kwargs[str(key)] = template.Variable(value)
+        return tag(*args, **kwargs)
+    return fun
+
+@parse_args
+def anchor(fields, name=None, fragment=None):
     """
     Parses a tag that's supposed to be in this format: {% anchor field title fragment %}
     """
-    bits = token.split_contents()
-    if not (2 < len(bits) < 5):
-        raise template.TemplateSyntaxError("anchor tag takes at least 2 arguments")
-    title = bits[2]
-    try:
-        fragment = bits[3]
-    except IndexError:
-        fragment = ''
-    return SortAnchorNode(bits[1].strip(), title.strip(), fragment.strip())
+    return SortAnchorNode(fields, name, fragment)
 
 class SortAnchorNode(template.Node):
     """
@@ -45,25 +54,26 @@ class SortAnchorNode(template.Node):
 
     """
     def __init__(self, field, title, fragment):
-        self.field = template.Variable(field)
-        self.title = title and template.Variable(title)
-        self.fragment = fragment and template.Variable(fragment)
+        self.field = field
+        self.title = title
+        self.fragment = fragment
 
     def render(self, context):
         request = context['request']
         getvars = request.GET.copy()
         field = self.field.resolve(context)
-        title = self.title and self.title.resolve(context)
+        title = self.title and self.title.resolve(context) or field
         fragment = self.fragment and self.fragment.resolve(context)
 
-        if getattr(request, 'sort', getvars.get('sort', '')) == field:
+        css_class = "sorting"
+        if getattr(request, 'sort', getvars.get('sort', '')) in field:
             sortdir = getattr(request, 'direction', getvars.get('direction', ''))
             getvars['direction'] = sort_directions[sortdir]['inverse']
             icon = sort_directions[sortdir]['icon']
-            css_class = "active " + getvars['direction']
+            css_class += " active %s" % getvars['direction']
         else:
             getvars['direction'] = 'desc'
-            css_class = icon = ''
+            icon = ''
         getvars['sort'] = field
         if icon:
             title = "%s %s" % (title, icon)
@@ -73,30 +83,18 @@ class SortAnchorNode(template.Node):
         url = urlunparse(('', '', '', None, getvars.urlencode(), fragment))
         return '<a href="%s" class="%s" title="%s">%s</a>' % (url, css_class, title, title)
 
-def autosort(parser, token):
-    bits = token.split_contents()
-    if not (1 < len(bits) < 5):
-        raise template.TemplateSyntaxError("autosort tag takes exactly one argument")
-    try:
-        accepted_fields = bits[2]
-    except IndexError:
-        accepted_fields = None
-
-    try:
-        default_ordering = bits[3]
-    except IndexError:
-        default_ordering = None
-
-    return SortedDataNode(bits[1], accepted_fields, default_ordering)
+@parse_args
+def autosort(queryset, accepted_fields=None, default_ordering=None):
+    return SortedDataNode(queryset, accepted_fields, default_ordering)
 
 class SortedDataNode(template.Node):
     """
     Automatically sort a queryset with {% autosort queryset [accepted_fields [default_ordering]] %}
     """
-    def __init__(self, queryset_var, accepted_fields=None, default_ordering=None):
-        self.queryset_var = template.Variable(queryset_var)
-        self.accepted_fields = accepted_fields and template.Variable(accepted_fields)
-        self.default_ordering = default_ordering and template.Variable(default_ordering)
+    def __init__(self, queryset_var, accepted_fields, default_ordering):
+        self.queryset_var = queryset_var
+        self.accepted_fields = accepted_fields
+        self.default_ordering = default_ordering
 
     def get_fields(self, request, accepted_fields=None, default_ordering=None):
         fields = getattr(request, 'sort', request.REQUEST.get('sort', ''))
@@ -119,8 +117,11 @@ class SortedDataNode(template.Node):
         value = self.queryset_var.resolve(context)
         request = context['request']
         accepted_fields = \
-            self.accepted_fields and [field.strip() for field in self.accepted_fields.resolve(context).split(',')]
+            self.accepted_fields and self.accepted_fields.resolve(context).split(',')
         default_ordering = self.default_ordering and self.default_ordering.resolve(context)
+        #accepted_fields = isinstance(basestring, accepted_fields) and
+            #self.accepted_fields and [field.strip() for field in self.accepted_fields.resolve(context).split(',')] \
+            #or accepted_fields
 
         order_by = value.query.order_by + self.get_fields(
             request,
@@ -137,6 +138,5 @@ class SortedDataNode(template.Node):
             context[key] = value
         return ''
 
-anchor = register.tag(anchor)
 autosort = register.tag(autosort)
-
+anchor = register.tag(anchor)
