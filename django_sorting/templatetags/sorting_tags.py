@@ -62,7 +62,7 @@ class SortAnchorNode(template.Node):
         request = context['request']
         getvars = request.GET.copy()
         field = self.field.resolve(context)
-        title = self.title and self.title.resolve(context) or field
+        title = unicode(self.title and self.title.resolve(context) or field)
         fragment = self.fragment and self.fragment.resolve(context)
 
         css_class = "sorting"
@@ -97,10 +97,16 @@ class SortedDataNode(template.Node):
         self.default_ordering = default_ordering
 
     def get_fields(self, request, accepted_fields=None, default_ordering=None):
+        def raw_fields(fields):
+            return [ field[1:] if field.startswith('-') else field for field in fields]
+
         fields = getattr(request, 'sort', request.REQUEST.get('sort', ''))
-        if not fields and default_ordering:
+        if not set(raw_fields(fields.split(','))).intersection(set(raw_fields(accepted_fields)))\
+                and default_ordering:
             fields = request.sort = default_ordering
-        direction = getattr(request, 'direction', request.REQUEST.get('direction', 'desc')) =='desc' and '-' or ''
+            direction = '-'
+        else:
+            direction = '-' if getattr(request, 'direction', request.REQUEST.get('direction', 'desc')) =='desc' else ''
 
         fields = [
             (direction == '-' and field.startswith('-') and field[1:]) or direction + field
