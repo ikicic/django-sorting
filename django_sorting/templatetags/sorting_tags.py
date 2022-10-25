@@ -66,7 +66,7 @@ class SortAnchorNode(template.Node):
         fragment = self.fragment and self.fragment.resolve(context)
 
         css_class = "sorting"
-        if getattr(request, 'sort', getvars.get('sort', '')) in field:
+        if getattr(request, 'sort', getvars.get('sort', '')) == field:
             sortdir = getattr(request, 'direction', getvars.get('direction', ''))
             getvars['direction'] = sort_directions[sortdir]['inverse']
             icon = sort_directions[sortdir]['icon']
